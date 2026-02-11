@@ -4,139 +4,159 @@ import io
 import zipfile
 
 # --- CONFIGURAZIONE ---
-st.set_page_config(page_title="Image Lab Pro", layout="wide")
+st.set_page_config(page_title="Ridimensiona Foto", layout="wide")
 
-# CSS: Stile Dark "Adobe Style"
+# --- CSS PER TEMA CHIARO E PULITO ---
 st.markdown("""
 <style>
-    /* Sfondo scuro professionale */
-    .stApp {background-color: #121212; color: #e0e0e0;}
+    /* Sfondo Bianco e Testo Leggibile */
+    .stApp {background-color: #FFFFFF; color: #333333;}
     
-    /* Sidebar grigio scuro */
-    section[data-testid="stSidebar"] {background-color: #1e1e1e;}
+    /* Sidebar Grigio Chiaro */
+    section[data-testid="stSidebar"] {background-color: #F0F2F6;}
     
-    /* Pulsanti VERDI (Azione) */
+    /* Pulsanti BLU evidenti */
     .stButton>button {
         width: 100%; 
         border-radius: 8px; 
         height: 3em; 
         font-weight: bold; 
-        font-size: 16px;
-        background-color: #2e7d32; 
-        color: white;
+        background-color: #0068C9; 
+        color: white; 
         border: none;
     }
-    .stButton>button:hover {background-color: #1b5e20; color: white;}
+    .stButton>button:hover {background-color: #004B91; color: white;}
     
-    /* Input Fields più scuri */
-    .stNumberInput input {background-color: #2c2c2c; color: white;}
+    /* Titoli più scuri */
+    h1, h2, h3 {color: #0E1117;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- FUNZIONI DI ELABORAZIONE ---
+# --- FUNZIONI DI LAVORO ---
 def process_image(img, target_w, target_h, mode, bg_color):
+    """Il cervello che ridimensiona le foto"""
     target_size = (int(target_w), int(target_h))
     
-    if mode == "CROP (Riempimento Smart)":
-        # Taglia i bordi in eccesso per riempire il frame (tipo Instagram)
+    if mode == "✂️ TAGLIA (Riempie tutto)":
+        # Zoomma e taglia l'eccesso (Centrato)
         return ImageOps.fit(img, target_size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
     
-    elif mode == "FIT (Adatta con Bordi)":
-        # Rimpicciolisce la foto per farla entrare, riempie il vuoto con colore
+    elif mode == "🖼️ ADATTA (Intera con bordi)":
+        # Rimpicciolisce per farla stare, aggiunge bordi
         return ImageOps.pad(img, target_size, color=bg_color, centering=(0.5, 0.5))
     
-    elif mode == "STRETCH (Deforma)":
-        # Forza le dimensioni (sconsigliato ma a volte serve)
+    else: # DEFORMA
+        # Allunga o schiaccia
         return img.resize(target_size, Image.Resampling.LANCZOS)
-        
-    return img
 
-# --- SIDEBAR (CONTROLLI) ---
+# --- BARRA LATERALE (IMPOSTAZIONI) ---
 with st.sidebar:
-    st.header("🎛️ CONTROLLI LAB")
+    st.header("⚙️ Impostazioni")
     
-    st.info("1. DIMENSIONI (Pixel)")
+    st.write("### 1. Misure Finali (Pixel)")
+    # Colonne per Width (Larghezza) e Height (Altezza)
     c1, c2 = st.columns(2)
-    with c1: w_input = st.number_input("Larghezza", value=1080, step=1)
-    with c2: h_input = st.number_input("Altezza", value=1080, step=1)
-    
-    st.divider()
-    
-    st.info("2. METODO DI TAGLIO")
-    resize_mode = st.radio("Logica:", 
-        ["CROP (Riempimento Smart)", "FIT (Adatta con Bordi)", "STRETCH (Deforma)"])
-    
-    bg_col = "#000000"
-    if "FIT" in resize_mode:
-        bg_col = st.color_picker("Colore Bordi", "#000000")
+    with c1: 
+        target_w = st.number_input("Larghezza", value=1080, step=1)
+    with c2: 
+        target_h = st.number_input("Altezza", value=1080, step=1)
         
     st.divider()
     
-    st.info("3. ESPORTAZIONE")
-    out_fmt = st.selectbox("Formato", ["JPEG", "PNG", "WEBP"])
-    quality = st.slider("Qualità %", 10, 100, 90)
-
-# --- MAIN AREA ---
-st.title("Image Lab Pro 🧪")
-st.markdown("Carica le tue foto, imposta le misure a sinistra, scarica lo ZIP.")
-
-files = st.file_uploader("Trascina qui le foto (Batch)", accept_multiple_files=True, type=['jpg','png','webp','jpeg'])
-
-if files:
-    # --- ANTEPRIMA ---
-    st.write("---")
-    col_preview, col_action = st.columns([1, 2])
+    st.write("### 2. Come ridimensiono?")
+    resize_mode = st.radio("Scegli metodo:", 
+        ["✂️ TAGLIA (Riempie tutto)", 
+         "🖼️ ADATTA (Intera con bordi)", 
+         "🥴 DEFORMA (Schiaccia/Allunga)"])
     
-    # Prendi la prima foto per mostrare l'esempio
-    first_img = Image.open(files[0])
-    preview_res = process_image(first_img, w_input, h_input, resize_mode, bg_col)
-    
-    with col_preview:
-        st.caption("👁️ ANTEPRIMA (1° FOTO)")
-        st.image(preview_res, caption=f"Output: {w_input}x{h_input}px", use_column_width=True)
-    
-    with col_action:
-        st.subheader(f"Pronto a elaborare {len(files)} foto?")
-        st.write(f"Verranno tutte ridimensionate a **{w_input}x{h_input}** usando il metodo **{resize_mode}**.")
+    # Se sceglie ADATTA, mostriamo il selettore colore
+    bg_color = "#FFFFFF" # Default bianco
+    if "ADATTA" in resize_mode:
+        bg_color = st.color_picker("Scegli colore bordi", "#FFFFFF")
         
-        # TASTO AZIONE
-        if st.button(f"🚀 ELABORA {len(files)} FOTO"):
-            
-            progress_bar = st.progress(0)
-            zip_buffer = io.BytesIO()
-            
-            with zipfile.ZipFile(zip_buffer, "w") as zf:
-                for i, file in enumerate(files):
-                    try:
-                        img = Image.open(file)
-                        res = process_image(img, w_input, h_input, resize_mode, bg_col)
-                        
-                        # Salvataggio in RAM
-                        img_byte = io.BytesIO()
-                        if out_fmt == 'JPEG':
-                            res = res.convert('RGB')
-                            res.save(img_byte, format=out_fmt, quality=quality)
-                        else:
-                            res.save(img_byte, format=out_fmt, quality=quality)
-                        
-                        # Aggiungi allo ZIP con nome pulito
-                        clean_name = file.name.split('.')[0]
-                        new_name = f"{w_input}x{h_input}_{clean_name}.{out_fmt.lower()}"
-                        zf.writestr(new_name, img_byte.getvalue())
-                        
-                    except Exception as e:
-                        st.error(f"Errore su {file.name}")
+    st.divider()
+    
+    st.write("### 3. Formato File")
+    out_format = st.selectbox("Salva come:", ["JPEG (Standard)", "PNG (Alta qualità)", "WEBP (Per siti web)"])
+    
+    quality = 90
+    if "JPEG" in out_format or "WEBP" in out_format:
+        quality = st.slider("Qualità %", 10, 100, 90)
+
+# --- PAGINA PRINCIPALE ---
+st.title("Ridimensiona Foto in Massa")
+st.markdown("Carica quante foto vuoi, imposta le misure a sinistra, scarica lo ZIP.")
+
+# Upload
+uploaded_files = st.file_uploader("Trascina qui le foto", accept_multiple_files=True, type=['jpg','png','webp','jpeg'])
+
+if uploaded_files:
+    # --- ANTEPRIMA INTELLIGENTE ---
+    st.divider()
+    
+    # Prendiamo la prima foto caricata per farti vedere come verrà
+    first_img = Image.open(uploaded_files[0])
+    
+    # Applichiamo la modifica di prova
+    preview_img = process_image(first_img, target_w, target_h, resize_mode, bg_color)
+    
+    # Mostriamo Prima e Dopo
+    c_orig, c_new = st.columns(2)
+    with c_orig:
+        st.caption(f"Originale ({first_img.width}x{first_img.height})")
+        st.image(first_img, use_column_width=True)
+    with c_new:
+        st.caption(f"RISULTATO ({target_w}x{target_h})")
+        st.image(preview_img, use_column_width=True)
+        
+    # --- TASTONE DI CONFERMA ---
+    st.success(f"L'anteprima ti piace? Se clicchi sotto elaboro tutte le **{len(uploaded_files)} foto** così.")
+    
+    if st.button(f"🚀 SCARICA TUTTO ({len(uploaded_files)} FILE)"):
+        
+        # Barra di progresso
+        progress_bar = st.progress(0)
+        zip_buffer = io.BytesIO()
+        
+        # Pulizia nome formato
+        fmt_clean = "JPEG"
+        if "PNG" in out_format: fmt_clean = "PNG"
+        elif "WEBP" in out_format: fmt_clean = "WEBP"
+
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for i, file in enumerate(uploaded_files):
+                try:
+                    img = Image.open(file)
+                    # Elaborazione
+                    res = process_image(img, target_w, target_h, resize_mode, bg_color)
                     
-                    progress_bar.progress((i + 1) / len(files))
-            
-            st.success("✅ Fatto!")
-            st.download_button(
-                label="📦 SCARICA ZIP COMPLETO",
-                data=zip_buffer.getvalue(),
-                file_name="imagelab_export.zip",
-                mime="application/zip",
-                type="primary"
-            )
-
-else:
-    st.info("👈 Inizia configurando le dimensioni nella barra laterale.")
+                    # Salvataggio
+                    img_byte = io.BytesIO()
+                    if fmt_clean == 'JPEG':
+                        res = res.convert('RGB') # JPEG non vuole trasparenze
+                        res.save(img_byte, format=fmt_clean, quality=quality)
+                    elif fmt_clean == 'WEBP':
+                        res.save(img_byte, format=fmt_clean, quality=quality)
+                    else: # PNG
+                        res.save(img_byte, format=fmt_clean)
+                    
+                    # Nome file nello ZIP
+                    name_part = file.name.split('.')[0]
+                    new_name = f"{target_w}x{target_h}_{name_part}.{fmt_clean.lower()}"
+                    
+                    zf.writestr(new_name, img_byte.getvalue())
+                    
+                except Exception as e:
+                    st.error(f"Errore sulla foto {file.name}: {e}")
+                
+                # Avanza barra
+                progress_bar.progress((i + 1) / len(uploaded_files))
+        
+        # Download Finale
+        st.download_button(
+            label="📦 CLICCA QUI PER SALVARE LO ZIP",
+            data=zip_buffer.getvalue(),
+            file_name="foto_ridimensionate.zip",
+            mime="application/zip",
+            type="primary"
+        )
